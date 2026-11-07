@@ -92,7 +92,8 @@ function peopleView(){return dayPick()+'<div class="card"><h2>Attribuer une lect
 function cfgView(){return'<div class="card"><h2>Réglages</h2><label>Date de début du défi<input type="date" id="st" value="'+esc(start||"")+'"></label><button class="btn" data-a="savestart">Enregistrer</button> <small>Vide tant que la date n’est pas choisie.</small></div>'}
 function render(){tabs();var v;if(!U)v=authView();else if(!P)v='<div class="card">Chargement du profil…</div>';else v=({bible:bibleView,call:callView,today:todayView,path:pathView,dash:dashView,point:pointView,people:peopleView,cfg:cfgView})[tab]();$("app").innerHTML=v;drawMini();if(tab=="call"&&CS=="live")drawCall();if(tab=="bible")loadChap()}
 function mail(){return"c"+$("em").value.replace(/\D/g,"")+"@rhema.app"}
-var room=null,CS="idle";
+var room=null,CS="idle",WL=null;
+async function keepAwake(){try{if(navigator.wakeLock&&!WL){WL=await navigator.wakeLock.request("screen");WL.addEventListener("release",function(){WL=null})}}catch(e){}}
 function callView(){var h='<div class="card"><h2>Rencontre de prière</h2><small>Appel audio uniquement · autorisez le micro quand le navigateur le demande</small>';
  if(CS!="live")h+='<p>Rejoignez la prière en direct.</p><button class="btn" data-a="join" '+(CS=="connecting"?"disabled":"")+'>'+(CS=="connecting"?"Connexion…":"Rejoindre la prière")+"</button>";
  else h+='<p class="ui"><b id="cn"></b></p><div class="tiles" id="tl"></div><p style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn alt" data-a="mic" id="micb"></button>'+(isA()?'<button class="btn alt" data-a="muteall">Couper tous les micros</button>':"")+'<button class="btn" style="background:var(--no);color:#fff" data-a="leave">Quitter</button></p>';
@@ -119,8 +120,8 @@ async function joinCall(){CS="connecting";render();
   room.on(L.RoomEvent.TrackSubscribed,function(t){if(t.kind=="audio"){document.body.appendChild(t.attach())}});
   room.on(L.RoomEvent.TrackUnsubscribed,function(t){t.detach().forEach(function(e){e.remove()})});
   ["ParticipantConnected","ParticipantDisconnected","ActiveSpeakersChanged","TrackMuted","TrackUnmuted","LocalTrackPublished","LocalTrackUnpublished"].forEach(function(n){room.on(L.RoomEvent[n],refresh)});
-  room.on(L.RoomEvent.Disconnected,function(){CS="idle";room=null;if(tab=="call")render()});
-  await room.connect(j.url,j.token);try{await room.localParticipant.setMicrophoneEnabled(true)}catch(e){}CS="live";render()}
+  room.on(L.RoomEvent.Disconnected,function(){CS="idle";room=null;try{if(WL)WL.release()}catch(e){}WL=null;if(tab=="call")render()});
+  await room.connect(j.url,j.token);try{await room.localParticipant.setMicrophoneEnabled(true)}catch(e){}keepAwake();CS="live";render()}
  catch(e){CS="idle";if(room){room.disconnect();room=null}render();alert("Appel impossible : "+e.message)}}
 async function act(a,el){note="";
  if((a=="login"||a=="signup")&&$("em").value.replace(/\D/g,"").length<8){alert("Entrez un contact valide (au moins 8 chiffres).");return}
@@ -143,5 +144,6 @@ async function act(a,el){note="";
  render();if(note&&U){var m=document.createElement("div");m.className="msg"+(note.indexOf("Erreur")==0?" err":"");m.textContent=note;$("app").prepend(m)}}
 document.addEventListener("click",function(e){var t=e.target.closest("[data-a],[data-tab],[data-day]");if(!t)return;if(t.dataset.tab){tab=t.dataset.tab;render()}else if(t.dataset.day){day=+t.dataset.day;render()}else if(t.type!="checkbox")act(t.dataset.a,t)});
 document.addEventListener("change",function(e){var t=e.target;if(t.id=="bv"){BV.ver=t.value;render();return}if(t.id=="bk"){BV.book=+t.value;BV.ch=1;render();return}if(t.id=="bc"){BV.ch=+t.value;render();return}if(t.type=="checkbox"&&t.dataset.a)act(t.dataset.a,t)});
+document.addEventListener("visibilitychange",function(){if(document.visibilityState=="visible"&&CS=="live"&&room){keepAwake();try{room.startAudio()}catch(e){}refresh()}});
 boot();
 </script></body></html>
