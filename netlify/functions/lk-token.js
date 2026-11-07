@@ -8,7 +8,8 @@ exports.handler = async (event) => {
     if (event.httpMethod !== "POST") return fail(405, "Méthode non autorisée");
     const auth = event.headers.authorization || event.headers.Authorization || "";
     const { SUPABASE_URL: SU, SUPABASE_ANON_KEY: SK, LIVEKIT_URL: LU, LIVEKIT_API_KEY: K, LIVEKIT_API_SECRET: S } = process.env;
-    if (!SU || !SK || !LU || !K || !S) return fail(500, "Variables d'environnement manquantes sur Netlify");
+    const manque = Object.entries({ SUPABASE_URL: SU, SUPABASE_ANON_KEY: SK, LIVEKIT_URL: LU, LIVEKIT_API_KEY: K, LIVEKIT_API_SECRET: S }).filter(([, v]) => !v).map(([n]) => n);
+    if (manque.length) return fail(500, "Variables manquantes sur Netlify : " + manque.join(", "));
     const u = await fetch(SU + "/auth/v1/user", { headers: { apikey: SK, Authorization: auth } });
     if (!u.ok) return fail(401, "Connexion requise");
     const user = await u.json();
